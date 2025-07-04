@@ -1,127 +1,224 @@
 #!/usr/bin/env python3
 """
-Minimal PySide6 App with Two Windows
+Loot Master PySide6 App with Styled Tables and Dummy Data
 
-This application opens two separate windows:
+Two windows:
 1. Loot Box Generator
 2. Player Inventory
 
-It also loads Excel data into three pandas tables:
-- items_df: master loot items
-- boxes_df: loot box definitions
-- inventory_df: flattened player inventories
+Each screen has:
+- Header controls (comboboxes, buttons)
+- Totals display
+- Styled table with columns [Rarity, Item, Qty, Value, Weight, Take, Drop]
+- Dummy rows
+- Buttons in cells print actions when clicked
 
 Run:
-    python minimal_pyside_app.py
+    python loot_master_app.py
 
 Requires:
-    PySide6, pandas, openpyxl
+    PySide6
 """
 
 import sys
-import os
-import pandas as pd
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget, QVBoxLayout
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QLabel,
+    QComboBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFrame,
+)
 from PySide6.QtCore import Qt
-
-# Path to Excel file
-EXCEL_FILE = os.path.join(os.path.dirname(__file__), "ErwinLootTable.xlsx")
+from PySide6.QtGui import QColor
 
 
-def load_data(filepath):
+# --- Shared table builder --------------------------------------------------
+def setup_table(
+    table: QTableWidget,
+    headers: list[str],
+    rows: list[tuple],
+    take_callback,
+    drop_callback,
+):
     """
-    Load loot data from Excel into three DataFrames:
-      - items_df: columns [Item, Description, Value, MaxQty, Weight, Scarcity]
-      - boxes_df: columns [BoxName, MaxItems, MinValue, MaxValue, MinScarcity, MaxScarcity]
-      - inventory_df: flattened inventory records [Player, Item, Qty, Value, Weight, Scarcity]
+    Configure QTableWidget with given headers and row data.
+    Last two columns are 'Take' and 'Drop' with buttons.
     """
-    # Items sheet
-    items_df = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
-    items_df.rename(
-        columns={"Value(GP)": "Value", "Max": "MaxQty", "Item scarecity": "Scarcity"},
-        inplace=True,
+    table.clear()
+    table.setColumnCount(len(headers))
+    table.setHorizontalHeaderLabels(headers)
+    table.setRowCount(len(rows))
+    table.setAlternatingRowColors(True)
+    table.setStyleSheet(
+        "QHeaderView::section { background: #aaa; padding: 4px; }"
+        "QTableWidget { gridline-color: #666; }"
     )
-
-    # Loot box definitions sheet
-    boxes_df = pd.read_excel(filepath, sheet_name="Loot box sizes")
-    boxes_df.rename(
-        columns={
-            "Loot box name": "BoxName",
-            "Max total items": "MaxItems",
-            "Min box value": "MinValue",
-            "Max box value": "MaxValue",
-            "Min scarecity": "MinScarcity",
-            "Max scarecity": "MaxScarcity",
-        },
-        inplace=True,
-    )
-
-    # Players sheet: flatten into inventory_df
-    players = pd.read_excel(filepath, sheet_name="Players", header=[0, 1])
-    records = []
-    for player in players.columns.levels[0]:
-        if player in ("Players", "Party"):
-            continue
-        for _, row in players.iterrows():
-            item = row.get((player, "Loot"))
-            qty = row.get((player, "Qty"))
-            if pd.notna(item) and pd.notna(qty):
-                records.append({"Player": player, "Item": item, "Qty": int(qty)})
-    inventory_df = pd.DataFrame(records)
-
-    # Enrich inventory with item details
-    inventory_df = inventory_df.merge(
-        items_df[["Item", "Value", "Weight", "Scarcity"]], on="Item", how="left"
-    )
-
-    return items_df, boxes_df, players, inventory_df
+    # Fill rows
+    for r, row in enumerate(rows):
+        # Data columns
+        for c, value in enumerate(row):
+            item = QTableWidgetItem(str(value))
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            table.setItem(r, c, item)
+        # Take button
+        btn_take = QPushButton("✓")
+        btn_take.setStyleSheet("background: #888; color: white; border-radius: 4px;")
+        btn_take.clicked.connect(lambda _, it=row[1]: take_callback(it))
+        table.setCellWidget(r, len(headers) - 2, btn_take)
+        # Drop button
+        btn_drop = QPushButton("X")
+        btn_drop.setStyleSheet("background: #F55; color: white; border-radius: 4px;")
+        btn_drop.clicked.connect(lambda _, it=row[1]: drop_callback(it))
+        table.setCellWidget(r, len(headers) - 1, btn_drop)
+    table.resizeColumnsToContents()
+    table.horizontalHeader().setStretchLastSection(True)
 
 
+# --- Loot Box Generator Window ---------------------------------------------
 class LootBoxGeneratorWindow(QMainWindow):
-    def __init__(self, data):
+    def __init__(self):
         super().__init__()
-        self.items_df, self.boxes_df, self.players_tmpl, self.inv_df = data
         self.setWindowTitle("Loot Box Generator")
-        self._setup_ui()
+        self._build_ui()
 
-    def _setup_ui(self):
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        label = QLabel("Loot Box Generator")
-        label.setAlignment(Qt.AlignCenter)
-        label.setStyleSheet("font-size: 24px;")
-        layout.addWidget(label)
-        # Future: add dropdowns, buttons, tables here
-        self.setCentralWidget(central)
+    def _build_ui(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+
+        # Top controls
+        h1 = QHBoxLayout()
+        h1.addWidget(QLabel("Loot Box:"))
+        self.box_combo = QComboBox()
+        self.box_combo.addItems(["Large Chest", "Small Bag"])
+        h1.addWidget(self.box_combo)
+        h1.addStretch()
+        roll_btn = QPushButton("Roll")
+        roll_btn.setStyleSheet(
+            "background: #F55; color: white; padding: 6px; border-radius: 4px;"
+        )
+        roll_btn.clicked.connect(self.on_roll)
+        h1.addWidget(roll_btn)
+        v.addLayout(h1)
+
+        # Separator line
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        v.addWidget(line)
+
+        # Player controls
+        h2 = QHBoxLayout()
+        h2.addWidget(QLabel("Player:"))
+        self.player_combo = QComboBox()
+        self.player_combo.addItems(["MrTinMan"])
+        h2.addWidget(self.player_combo)
+        h2.addStretch()
+        takeall_btn = QPushButton("Take All")
+        takeall_btn.setStyleSheet(
+            "background: #F55; color: white; padding: 6px; border-radius: 4px;"
+        )
+        takeall_btn.clicked.connect(lambda: print("Take All pressed"))
+        h2.addWidget(takeall_btn)
+        v.addLayout(h2)
+
+        # Totals
+        h3 = QHBoxLayout()
+        self.weight_lbl = QLabel("Total Weight: 7.3")
+        h3.addWidget(self.weight_lbl)
+        h3.addStretch()
+        self.value_lbl = QLabel("Total Value: 2210")
+        h3.addWidget(self.value_lbl)
+        v.addLayout(h3)
+
+        # Table
+        self.table = QTableWidget()
+        v.addWidget(self.table)
+
+        # Populate dummy
+        headers = ["Rarity", "Item", "Qty", "Value", "Weight", "Take", "Drop"]
+        dummy = [
+            (2, "Gold Coin", 10, 10, 1),
+            (3, "Sunstone", 2, 150, 4),
+            (6, "Jeweled Lockbox", 1, 850, 2),
+            (4, "True Ice Necklace", 3, 1200, 0.3),
+        ]
+        setup_table(self.table, headers, dummy, self.on_take, self.on_drop)
+
+        self.setCentralWidget(w)
+
+    def on_roll(self):
+        print(f"Roll pressed (box={self.box_combo.currentText()})")
+
+    def on_take(self, item):
+        print(f"Take {item}")
+
+    def on_drop(self, item):
+        print(f"Drop {item}")
 
 
+# --- Player Inventory Window ----------------------------------------------
 class PlayerInventoryWindow(QMainWindow):
-    def __init__(self, data):
+    def __init__(self):
         super().__init__()
-        self.items_df, self.boxes_df, self.players_tmpl, self.inv_df = data
         self.setWindowTitle("Player Inventory")
-        self._setup_ui()
+        self._build_ui()
 
-    def _setup_ui(self):
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        label = QLabel("Player Inventory")
-        label.setAlignment(Qt.AlignCenter)
-        label.setStyleSheet("font-size: 24px;")
-        layout.addWidget(label)
-        # Future: add inventory table and controls here
-        self.setCentralWidget(central)
+    def _build_ui(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+
+        # Player selector
+        h1 = QHBoxLayout()
+        h1.addWidget(QLabel("Player:"))
+        self.owner_combo = QComboBox()
+        self.owner_combo.addItems(["MrTinMan", "Party"])
+        h1.addWidget(self.owner_combo)
+        h1.addStretch()
+        v.addLayout(h1)
+
+        # Totals
+        h2 = QHBoxLayout()
+        self.weight_lbl = QLabel("Total Weight: 7.3")
+        h2.addWidget(self.weight_lbl)
+        h2.addStretch()
+        self.value_lbl = QLabel("Total Value: 2210")
+        h2.addWidget(self.value_lbl)
+        v.addLayout(h2)
+
+        # Table
+        self.table = QTableWidget()
+        v.addWidget(self.table)
+
+        # Dummy inventory rows
+        headers = ["Rarity", "Item", "Qty", "Value", "Weight", "Trade", "Drop"]
+        dummy = [
+            (2, "Gold Coin", 10, 10, 1),
+            (3, "Sunstone", 2, 150, 4),
+            (6, "Jeweled Lockbox", 1, 850, 2),
+            (4, "True Ice Necklace", 3, 1200, 0.3),
+        ]
+        setup_table(self.table, headers, dummy, self.on_trade, self.on_drop)
+
+        self.setCentralWidget(w)
+
+    def on_trade(self, item):
+        print(f"Trade {item}")
+
+    def on_drop(self, item):
+        print(f"Drop {item}")
 
 
+# --- Main entry -----------------------------------------------------------
 if __name__ == "__main__":
-    # Load data before creating windows
-    data = load_data(EXCEL_FILE)
-
     app = QApplication(sys.argv)
-    # Pass loaded data to both windows
-    loot_window = LootBoxGeneratorWindow(data)
-    inv_window = PlayerInventoryWindow(data)
-
-    loot_window.show()
-    inv_window.show()
+    loot_win = LootBoxGeneratorWindow()
+    inv_win = PlayerInventoryWindow()
+    loot_win.show()
+    inv_win.show()
     sys.exit(app.exec())
