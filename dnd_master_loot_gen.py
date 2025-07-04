@@ -7,7 +7,7 @@ Two windows:
 2. Player Inventory
 
 Features:
-- Load real data from ErwinLootTable.xlsx
+- Load real data from loot_table.xlsx
 - Roll loot and "Take" updates inventory immediately
 - Auto-update Excel when checkbox is enabled
 - Inventory window refreshes dynamically on "Take"
@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 # --- Excel I/O functions ---------------------------------------------------
-EXCEL_FILE = os.path.join(os.path.dirname(__file__), "ErwinLootTable.xlsx")
+EXCEL_FILE = os.path.join(os.path.dirname(__file__), "loot_table.xlsx")
 
 
 def write_inventory(inv_df, players_template, filepath):
@@ -94,6 +94,7 @@ def load_data(filepath):
     )
     # Read players sheet with two header rows manually
     raw = pd.read_excel(filepath, sheet_name="Players", header=None)
+    raw = raw.iloc[:, 1:]
     # First two rows are headers
     lvl0 = raw.iloc[0].fillna(method="ffill")
     lvl1 = raw.iloc[1]

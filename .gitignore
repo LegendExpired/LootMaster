@@ -1,0 +1,4 @@
+# Ignore loot_table.xlsx and build/dist artifacts
+loot_table.xlsx
+build/
+dist/
