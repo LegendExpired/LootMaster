@@ -163,6 +163,31 @@ def load_data(filepath):
             ):
                 raise Exception("Regenerated file")
 
+    # --- Helper: validate all rows in a DataFrame for numeric columns ---
+    def validate_numeric_columns(df, columns, sheet_name):
+        for col in columns:
+            if col not in df.columns:
+                QMessageBox.critical(
+                    None,
+                    f"Missing Column in {sheet_name} Sheet",
+                    f"Column '{col}' is missing from the {sheet_name} sheet.\nPlease fix the sheet in Excel and reload.",
+                )
+                sys.exit(1)
+            # Check all rows for non-numeric values
+            for idx, val in df[col].items():
+                if not pd.api.types.is_number(val):
+                    item_name = (
+                        df.loc[idx, "Item"] if "Item" in df.columns else str(idx)
+                    )
+                    QMessageBox.critical(
+                        None,
+                        "Invalid Data in Excel",
+                        f"Non-numeric value in column '{col}' for item '{item_name}' in the {sheet_name} sheet.\nPlease fix this value in Excel and reload.",
+                    )
+                    sys.exit(1)
+            # Coerce to numeric if all are valid
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
     # --- Try to load all sheets, handle missing/corrupt ---
     try:
         xl = pd.ExcelFile(filepath)
@@ -193,6 +218,8 @@ def load_data(filepath):
     check_columns(
         items, ["Item", "Value", "MaxQty", "Weight", "Scarcity"], "Loot", xl_ref=xl
     )
+    # Validate all rows in Loot sheet for numeric columns
+    validate_numeric_columns(items, ["Value", "MaxQty", "Weight", "Scarcity"], "Loot")
 
     # --- Loot box sizes sheet ---
     try:
@@ -218,6 +245,12 @@ def load_data(filepath):
         ["BoxName", "MaxItems", "MinValue", "MaxValue", "MinScarcity", "MaxScarcity"],
         "Loot box sizes",
         xl_ref=xl,
+    )
+    # Validate all rows in Loot box sizes sheet for numeric columns
+    validate_numeric_columns(
+        boxes,
+        ["MaxItems", "MinValue", "MaxValue", "MinScarcity", "MaxScarcity"],
+        "Loot box sizes",
     )
 
     # --- Players sheet: check MultiIndex header ---
@@ -294,15 +327,32 @@ def load_data(filepath):
                 xl.close()
                 sys.exit(1)
     xl.close()
-    # --- Validate numeric columns ---
-    for col in ["Qty"]:
-        if not pd.api.types.is_numeric_dtype(inv[col]):
-            inv = inv[pd.to_numeric(inv[col], errors="coerce").notnull()]
-            inv[col] = pd.to_numeric(inv[col], errors="coerce")
+    # --- Validate numeric columns in inventory (Players) ---
+    numeric_cols = ["Qty"]
+    for col in numeric_cols:
+        if col not in inv.columns:
+            QMessageBox.critical(
+                None,
+                "Missing Column in Players Sheet",
+                f"Column '{col}' is missing from the Players sheet.\nPlease fix the sheet in Excel and reload.",
+            )
+            sys.exit(1)
+        for idx, val in inv[col].items():
+            if not pd.api.types.is_number(val):
+                item_name = inv.loc[idx, "Item"] if "Item" in inv.columns else str(idx)
+                QMessageBox.critical(
+                    None,
+                    "Invalid Data in Excel",
+                    f"Non-numeric value in column '{col}' for item '{item_name}' in the Players sheet.\nPlease fix this value in Excel and reload.",
+                )
+                sys.exit(1)
+        inv[col] = pd.to_numeric(inv[col], errors="coerce")
     # Merge loot info
     inv = inv.merge(
         items[["Item", "Value", "Weight", "Scarcity"]], on="Item", how="left"
     )
+    # Validate loot columns are numeric and present in merged inventory
+    validate_numeric_columns(inv, ["Value", "Weight", "Scarcity"], "Loot (Inventory)")
     return items, boxes, players, inv
 
 
