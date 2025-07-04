@@ -374,6 +374,12 @@ class PlayerInventoryWindow(QMainWindow):
         self.owner_combo.currentTextChanged.connect(self.refresh)
         h1.addWidget(self.owner_combo)
         h1.addStretch()
+        # Add button to manually add items
+        add_btn = QPushButton("+")
+        add_btn.setFixedWidth(30)
+        add_btn.setToolTip("Add item to player inventory")
+        add_btn.clicked.connect(self.show_add_item_dialog)
+        h1.addWidget(add_btn)
         v.addLayout(h1)
         h2 = QHBoxLayout()
         self.wlbl = QLabel("Total Weight: 0.0")
@@ -474,6 +480,85 @@ class PlayerInventoryWindow(QMainWindow):
         if self.excel_options.auto_chk.isChecked():
             write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
         self.refresh(owner)
+
+    def show_add_item_dialog(self):
+        owner = self.owner_combo.currentText()
+        if owner == "Party":
+            QMessageBox.information(
+                self, "Add Disabled", "Cannot add items when 'Party' is selected."
+            )
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Add Item to {owner}")
+        layout = QVBoxLayout()
+        # Dropdown for items
+        item_combo = QComboBox()
+        loot_items = self.items["Item"].tolist()
+        item_combo.addItems(loot_items)
+        layout.addWidget(QLabel("Select Item:"))
+        layout.addWidget(item_combo)
+        # Slider for quantity
+        qty_slider = QSlider(Qt.Horizontal)
+        qty_slider.setMinimum(1)
+
+        # Set max based on selected item
+        def update_slider_max():
+            item = item_combo.currentText()
+            max_qty = int(self.items[self.items["Item"] == item]["MaxQty"].iloc[0])
+            qty_slider.setMaximum(max_qty)
+            qty_slider.setValue(1)
+
+        item_combo.currentTextChanged.connect(update_slider_max)
+        update_slider_max()
+        layout.addWidget(QLabel("Quantity:"))
+        layout.addWidget(qty_slider)
+        qty_label = QLabel("1")
+        layout.addWidget(qty_label)
+        qty_slider.valueChanged.connect(lambda v: qty_label.setText(str(v)))
+        # Weight and value display
+        value_label = QLabel()
+        weight_label = QLabel()
+
+        def update_value_weight():
+            item = item_combo.currentText()
+            qty = qty_slider.value()
+            row = self.items[self.items["Item"] == item].iloc[0]
+            total_value = round(row["Value"] * qty, 1)
+            total_weight = round(row["Weight"] * qty, 1)
+            value_label.setText(f"Total Value: {total_value}")
+            weight_label.setText(f"Total Weight: {total_weight}")
+
+        qty_slider.valueChanged.connect(update_value_weight)
+        item_combo.currentTextChanged.connect(update_value_weight)
+        update_value_weight()
+        layout.addWidget(value_label)
+        layout.addWidget(weight_label)
+        # OK/Cancel
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        layout.addWidget(buttons)
+        dlg.setLayout(layout)
+        result = []
+
+        def accept():
+            result.append((item_combo.currentText(), qty_slider.value()))
+            dlg.accept()
+
+        buttons.accepted.connect(accept)
+        buttons.rejected.connect(dlg.reject)
+        if dlg.exec() == QDialog.Accepted and result:
+            item, qty = result[0]
+            row = self.items[self.items["Item"] == item].iloc[0]
+            self.inv_df.loc[len(self.inv_df)] = {
+                "Player": owner,
+                "Item": item,
+                "Qty": qty,
+                "Value": row["Value"],
+                "Weight": row["Weight"],
+                "Scarcity": row["Scarcity"],
+            }
+            if self.excel_options.auto_chk.isChecked():
+                write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
+            self.refresh(owner)
 
     def closeEvent(self, event):
         QApplication.instance().quit()
