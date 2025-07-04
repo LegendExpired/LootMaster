@@ -140,12 +140,11 @@ Closing either window via the red **X** will exit the entire application.
 
 ## Future Plans
 
-1. **Editable Descriptions**: Hover tooltips showing item descriptions loaded from Excel.
-2. **Save/Load Profiles**: Support multiple campaign files beyond one Excel.
-3. **Trade & Drop**: Implement action buttons in the inventory window.
-4. **Export Reports**: Generate PDF or CSV summaries of inventory states.
-5. **Plugin System**: Allow custom roll formulas or additional loot sources.
-6. **Cross-platform Packaging**: Create single-file executables for Windows, macOS, and Linux.
+Yeah this is a once off... if there is a true demand, I may consider putting a proper database and cross platform editor in instead of using excel, but this is just a quick app for now.
+
+I recommend using react native and nodejs with something like google firebase etc if really desired.
+
+Ps. I didn't do number 4 and 5 of the error handling due to time, so please note some error handling is still required.
 
 ---
 

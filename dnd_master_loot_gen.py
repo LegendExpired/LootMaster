@@ -922,7 +922,11 @@ class PlayerInventoryWindow(QMainWindow):
         # Auto-update Excel if enabled (use shared excel_options)
         if self.excel_options.auto_chk.isChecked():
             write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
-        self.refresh(owner)
+
+        if drop_or_trade == "trade":
+            self.show_add_item_dialog()
+        else:
+            self.refresh(owner)
 
     def show_add_item_dialog(self):
         owner = self.owner_combo.currentText()
