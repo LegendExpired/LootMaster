@@ -182,6 +182,103 @@ def setup_table(table: QTableWidget, headers, rows, action1, action2):
     table.horizontalHeader().setStretchLastSection(True)
 
 
+# Create default loot Excel file with predefined structure
+def create_default_loot_excel(filepath: str):
+    """
+    Create a new Excel file at `filepath` with three sheets formatted for Loot Master App:
+
+    1) Loot
+       Columns: Item, Description, Value(GP), Max, Weight, Item scarecity
+       - Gold Coin
+       - Silver Coin
+       - Jewelry Box
+
+    2) Loot box sizes
+       Columns: Loot box name, Max total items, Min box value, Max box value, Min scarecity, Max scarecity
+       - Small Chest
+       - Medium Chest
+       - Large Chest
+
+    3) Players
+       MultiIndex columns: level 0 = [Player 1, Player 2], level 1 = [Loot, Qty]
+       One row: each player starts with 10 Gold Coins.
+    """
+    # 1) Loot sheet
+    loot_df = pd.DataFrame(
+        [
+            {
+                "Item": "Gold Coin",
+                "Description": "Standard gold currency",
+                "Value(GP)": 1.0,
+                "Max": 100,
+                "Weight": 0.02,
+                "Item scarecity": 1,
+            },
+            {
+                "Item": "Silver Coin",
+                "Description": "Standard silver currency",
+                "Value(GP)": 0.1,
+                "Max": 200,
+                "Weight": 0.01,
+                "Item scarecity": 2,
+            },
+            {
+                "Item": "Jewelry Box",
+                "Description": "Small ornate jewelry box",
+                "Value(GP)": 50.0,
+                "Max": 1,
+                "Weight": 1.0,
+                "Item scarecity": 5,
+            },
+        ]
+    )
+
+    # 2) Loot box sizes sheet
+    boxes_df = pd.DataFrame(
+        [
+            {
+                "Loot box name": "Small Chest",
+                "Max total items": 3,
+                "Min box value": 1.0,
+                "Max box value": 20.0,
+                "Min scarecity": 1,
+                "Max scarecity": 3,
+            },
+            {
+                "Loot box name": "Medium Chest",
+                "Max total items": 5,
+                "Min box value": 10.0,
+                "Max box value": 50.0,
+                "Min scarecity": 1,
+                "Max scarecity": 5,
+            },
+            {
+                "Loot box name": "Large Chest",
+                "Max total items": 10,
+                "Min box value": 20.0,
+                "Max box value": 200.0,
+                "Min scarecity": 1,
+                "Max scarecity": 6,
+            },
+        ]
+    )
+
+    # 3) Players sheet with MultiIndex columns
+    players_cols = pd.MultiIndex.from_product(
+        [["Player 1", "Player 2"], ["Loot", "Qty"]], names=[None, None]
+    )
+    # single row: both players start with 10 Gold Coins
+    players_df = pd.DataFrame(
+        [["Gold Coin", 10, "Gold Coin", 10]], columns=players_cols
+    )
+
+    # Write to Excel
+    with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+        loot_df.to_excel(writer, sheet_name="Loot", index=False)
+        players_df.to_excel(writer, sheet_name="Players")
+        boxes_df.to_excel(writer, sheet_name="Loot box sizes", index=False)
+
+
 # --- GUI windows -----------------------------------------------------------
 class ExcelOptionsWindow(QDialog):
     def __init__(self, parent=None, reload_callback=None, write_callback=None):
@@ -597,13 +694,18 @@ class PlayerInventoryWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+
     def reload_all():
         new_data = load_data(EXCEL_FILE)
         lw.items, lw.boxes, lw.players_tmpl, lw.inv_df = new_data
         iw.items, iw.boxes, iw.players_tmpl, iw.inv_df = new_data
         lw.box_combo.clear()
         lw.box_combo.addItems(lw.boxes.BoxName.tolist())
-        players = [p for p in lw.players_tmpl.columns.levels[0] if p not in ("Players", "Party")]
+        players = [
+            p
+            for p in lw.players_tmpl.columns.levels[0]
+            if p not in ("Players", "Party")
+        ]
         lw.player_combo.clear()
         lw.player_combo.addItems(players)
         owners = players + ["Party"]
@@ -611,10 +713,14 @@ if __name__ == "__main__":
         iw.owner_combo.addItems(owners)
         lw._refresh_table()
         iw.refresh(iw.owner_combo.currentText())
+
     def write_all():
         # Write all player inventories to Excel using the current data
         write_inventory(iw.inv_df, iw.players_tmpl, EXCEL_FILE)
-    excel_options = ExcelOptionsWindow(reload_callback=reload_all, write_callback=write_all)
+
+    excel_options = ExcelOptionsWindow(
+        reload_callback=reload_all, write_callback=write_all
+    )
     data = load_data(EXCEL_FILE)
     lw = LootBoxGeneratorWindow(data, excel_options)
     iw = PlayerInventoryWindow(data, excel_options)
