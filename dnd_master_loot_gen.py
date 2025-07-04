@@ -50,7 +50,10 @@ EXCEL_FILE = os.path.join(os.path.dirname(__file__), "loot_table.xlsx")
 def write_inventory(inv_df, players_template, filepath):
     """
     Write back the 'Players' sheet, preserving structure. Merge duplicate items for each player.
+    Handles OS/I/O errors with user-friendly dialogs.
     """
+    import errno
+
     players = [
         p for p in players_template.columns.levels[0] if p not in ("Players", "Party")
     ]
@@ -67,24 +70,94 @@ def write_inventory(inv_df, players_template, filepath):
             new_df.at[i, (p, "Loot")] = row["Item"]
             new_df.at[i, (p, "Qty")] = row["Qty"]
     # write
-    with pd.ExcelWriter(
-        filepath, engine="openpyxl", mode="a", if_sheet_exists="replace"
-    ) as writer:
-        new_df.to_excel(
-            writer, sheet_name="Players"
-        )  # allow index column since MultiIndex headers require index
+    try:
+        with pd.ExcelWriter(
+            filepath, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            new_df.to_excel(
+                writer, sheet_name="Players"
+            )  # allow index column since MultiIndex headers require index
+    except PermissionError as e:
+        QMessageBox.critical(
+            None,
+            "Excel File Locked or Permission Denied",
+            f"Cannot write to Excel file.\n\nReason: {str(e)}\n\nPlease close the file in Excel or check your permissions.",
+        )
+    except OSError as e:
+        if e.errno == errno.ENOSPC:
+            QMessageBox.critical(None, "Disk Full", "Saving failed: Disk is full.")
+        elif e.errno == errno.EINVAL:
+            QMessageBox.critical(
+                None, "Invalid File Path", f"Invalid file path: {filepath}"
+            )
+        else:
+            QMessageBox.critical(
+                None, "File Write Error", f"Error writing to Excel file:\n{str(e)}"
+            )
+    except Exception as e:
+        QMessageBox.critical(
+            None, "Unknown Error", f"Unexpected error writing Excel file:\n{str(e)}"
+        )
 
 
 # --- Data loading and logic ------------------------------------------------
 def load_data(filepath):
     # Load items
-    items = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
+    try:
+        items = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
+    except FileNotFoundError:
+        dirpath = os.path.dirname(filepath)
+        ret = QMessageBox.question(
+            None,
+            "Excel File Not Found",
+            f"Excel file not found in:\n{dirpath}\n\nWould you like to create a new file?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if ret == QMessageBox.Yes:
+            create_default_loot_excel(filepath)
+            items = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
+        else:
+            raise
+    except PermissionError as e:
+        QMessageBox.critical(
+            None,
+            "Excel File Locked or Permission Denied",
+            f"Cannot read Excel file.\n\nReason: {str(e)}\n\nPlease close the file in Excel or check your permissions.",
+        )
+        raise
+    except OSError as e:
+        import errno
+
+        if e.errno == errno.ENOSPC:
+            QMessageBox.critical(None, "Disk Full", "Loading failed: Disk is full.")
+        elif e.errno == errno.EINVAL:
+            QMessageBox.critical(
+                None, "Invalid File Path", f"Invalid file path: {filepath}"
+            )
+        else:
+            QMessageBox.critical(
+                None, "File Read Error", f"Error reading Excel file:\n{str(e)}"
+            )
+        raise
+    except Exception as e:
+        QMessageBox.critical(
+            None, "Unknown Error", f"Unexpected error reading Excel file:\n{str(e)}"
+        )
+        raise
     items.rename(
         columns={"Value(GP)": "Value", "Max": "MaxQty", "Item scarecity": "Scarcity"},
         inplace=True,
     )
     # Load boxes
-    boxes = pd.read_excel(filepath, sheet_name="Loot box sizes")
+    try:
+        boxes = pd.read_excel(filepath, sheet_name="Loot box sizes")
+    except Exception as e:
+        QMessageBox.critical(
+            None,
+            "Excel Sheet Error",
+            f"Error loading 'Loot box sizes' sheet:\n{str(e)}",
+        )
+        raise
     boxes.rename(
         columns={
             "Loot box name": "BoxName",
@@ -97,7 +170,13 @@ def load_data(filepath):
         inplace=True,
     )
     # Read players sheet with two header rows manually
-    raw = pd.read_excel(filepath, sheet_name="Players", header=None)
+    try:
+        raw = pd.read_excel(filepath, sheet_name="Players", header=None)
+    except Exception as e:
+        QMessageBox.critical(
+            None, "Excel Sheet Error", f"Error loading 'Players' sheet:\n{str(e)}"
+        )
+        raise
     raw = raw.iloc[:, 1:]
     # First two rows are headers
     lvl0 = raw.iloc[0].fillna(method="ffill")
@@ -128,9 +207,9 @@ def roll_loot(box_name, items_df, boxes_df):
     box = boxes_df[boxes_df.BoxName == box_name].iloc[0]
     c = items_df[
         (items_df.Scarcity >= box.MinScarcity)
-        & (itemsDf.Scarcity <= box.MaxScarcity)
-        & (itemsDf.Value >= box.MinValue)
-        & (itemsDf.Value <= box.MaxValue)
+        & (items_df.Scarcity <= box.MaxScarcity)
+        & (items_df.Value >= box.MinValue)
+        & (items_df.Value <= box.MaxValue)
     ]
     n = min(int(box.MaxItems), len(c))
     chosen = c.sample(n)
@@ -185,7 +264,7 @@ def setup_table(table: QTableWidget, headers, rows, action1, action2):
 # Create default loot Excel file with predefined structure
 def create_default_loot_excel(filepath: str):
     """
-    Create a new Excel file at `filepath` with three sheets formatted for Loot Master App:
+    Create a new Excel file at `filepath` with three sheets formatted for Loot Master App.
 
     1) Loot
        Columns: Item, Description, Value(GP), Max, Weight, Item scarecity
@@ -273,10 +352,36 @@ def create_default_loot_excel(filepath: str):
     )
 
     # Write to Excel
-    with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
-        loot_df.to_excel(writer, sheet_name="Loot", index=False)
-        players_df.to_excel(writer, sheet_name="Players")
-        boxes_df.to_excel(writer, sheet_name="Loot box sizes", index=False)
+    try:
+        with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+            loot_df.to_excel(writer, sheet_name="Loot", index=False)
+            players_df.to_excel(writer, sheet_name="Players")
+            boxes_df.to_excel(writer, sheet_name="Loot box sizes", index=False)
+    except PermissionError as e:
+        QMessageBox.critical(
+            None,
+            "Excel File Locked or Permission Denied",
+            f"Cannot create Excel file.\n\nReason: {str(e)}\n\nPlease close the file in Excel or check your permissions.",
+        )
+    except OSError as e:
+        import errno
+
+        if e.errno == errno.ENOSPC:
+            QMessageBox.critical(
+                None, "Disk Full", "Creating file failed: Disk is full."
+            )
+        elif e.errno == errno.EINVAL:
+            QMessageBox.critical(
+                None, "Invalid File Path", f"Invalid file path: {filepath}"
+            )
+        else:
+            QMessageBox.critical(
+                None, "File Create Error", f"Error creating Excel file:\n{str(e)}"
+            )
+    except Exception as e:
+        QMessageBox.critical(
+            None, "Unknown Error", f"Unexpected error creating Excel file:\n{str(e)}"
+        )
 
 
 # --- GUI windows -----------------------------------------------------------
@@ -693,10 +798,15 @@ class PlayerInventoryWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    # Check if Excel file exists, if not, create it
+    # Check if Excel file exists, if not, create it (with error handling)
     if not os.path.exists(EXCEL_FILE):
-        create_default_loot_excel(EXCEL_FILE)
-
+        try:
+            create_default_loot_excel(EXCEL_FILE)
+        except Exception as e:
+            QMessageBox.critical(
+                None, "Excel File Error", f"Failed to create Excel file:\n{str(e)}"
+            )
+            sys.exit(1)
     app = QApplication(sys.argv)
 
     def reload_all():
