@@ -235,6 +235,8 @@ class LootBoxGeneratorWindow(QMainWindow):
         self.table = QTableWidget()
         v.addWidget(self.table)
         self.setCentralWidget(w)
+        self.setMinimumSize(500, 327)
+        self.resize(500, 327)
 
     def _hr(self):
         ln = QFrame()
@@ -310,6 +312,9 @@ class LootBoxGeneratorWindow(QMainWindow):
     def closeEvent(self, event):
         QApplication.instance().quit()
 
+    def resizeEvent(self, event):
+        pass  # Remove printout
+
 
 class PlayerInventoryWindow(QMainWindow):
     def __init__(self, data):
@@ -344,6 +349,8 @@ class PlayerInventoryWindow(QMainWindow):
         self.table = QTableWidget()
         v.addWidget(self.table)
         self.setCentralWidget(w)
+        self.setMinimumSize(500, 260)
+        self.resize(500, 260)
         self.refresh(self.owner_combo.currentText())
 
     def refresh(self, owner):
@@ -368,6 +375,9 @@ class PlayerInventoryWindow(QMainWindow):
 
     def closeEvent(self, event):
         QApplication.instance().quit()
+
+    def resizeEvent(self, event):
+        pass  # Remove printout
 
 
 if __name__ == "__main__":
