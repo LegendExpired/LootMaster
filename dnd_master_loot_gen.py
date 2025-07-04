@@ -45,16 +45,20 @@ EXCEL_FILE = os.path.join(os.path.dirname(__file__), "ErwinLootTable.xlsx")
 
 def write_inventory(inv_df, players_template, filepath):
     """
-    Write back the 'Players' sheet, preserving structure.
+    Write back the 'Players' sheet, preserving structure. Merge duplicate items for each player.
     """
     players = [
         p for p in players_template.columns.levels[0] if p not in ("Players", "Party")
     ]
-    max_rows = inv_df.groupby("Player").size().max() if not inv_df.empty else 0
+    # Merge duplicate items for each player by summing Qty
+    merged = inv_df.groupby(["Player", "Item"], as_index=False).agg(
+        {"Qty": "sum", "Value": "first", "Weight": "first", "Scarcity": "first"}
+    )
+    max_rows = merged.groupby("Player").size().max() if not merged.empty else 0
     # prepare blank DataFrame with same MultiIndex
     new_df = pd.DataFrame(index=range(max_rows), columns=players_template.columns)
     for p in players:
-        grp = inv_df[inv_df["Player"] == p].reset_index(drop=True)
+        grp = merged[merged["Player"] == p].reset_index(drop=True)
         for i, row in grp.iterrows():
             new_df.at[i, (p, "Loot")] = row["Item"]
             new_df.at[i, (p, "Qty")] = row["Qty"]
