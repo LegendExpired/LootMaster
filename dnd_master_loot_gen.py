@@ -45,9 +45,23 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 
 
+# --- Resource and base directory helper for PyInstaller and dev ---
+def app_base_dir():
+    if getattr(sys, "frozen", False):  # PyInstaller
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def resource_path(relative_path):
+    # For bundled resources (icons, etc.)
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(app_base_dir(), relative_path)
+
+
 # --- Version management: read from VERSION file ---
 def get_version():
-    version_file = os.path.join(os.path.dirname(__file__), "VERSION")
+    version_file = os.path.join(app_base_dir(), "VERSION")
     try:
         with open(version_file, "r", encoding="utf-8") as f:
             return f.read().strip()
@@ -58,7 +72,7 @@ def get_version():
 VERSION = get_version()
 
 # --- Excel I/O functions ---------------------------------------------------
-EXCEL_FILE = os.path.join(os.path.dirname(__file__), "loot_table.xlsx")
+EXCEL_FILE = os.path.join(app_base_dir(), "loot_table.xlsx")
 
 
 def write_inventory(inv_df, players_template, filepath):

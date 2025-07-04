@@ -73,7 +73,7 @@ Loot Master is a D&D loot and inventory management app with a PySide6 GUI and Ex
    ```
 2. **Build the App as a Single Executable:**
    ```sh
-   pyinstaller --onefile --windowed --icon=resources/loot_box_icon.ico dnd_master_loot_gen.py
+   pyinstaller --onefile --windowed --icon resources/loot_box_icon.ico --add-data "resources/loot_box_icon.ico;resources" dnd_master_loot_gen.py
    ```
    - The `--onefile` flag creates a single executable.
    - The `--windowed` flag prevents a console window from appearing (for GUI apps).
