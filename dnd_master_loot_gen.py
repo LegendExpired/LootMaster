@@ -183,20 +183,32 @@ def setup_table(table: QTableWidget, headers, rows, action1, action2):
 
 
 # --- GUI windows -----------------------------------------------------------
+class ExcelOptionsWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Excel Options")
+        self.setMinimumSize(250, 100)
+        layout = QVBoxLayout()
+        self.auto_chk = QCheckBox("Auto-update Excel")
+        layout.addWidget(self.auto_chk)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok)
+        btns.accepted.connect(self.accept)
+        layout.addWidget(btns)
+        self.setLayout(layout)
+
+
 class LootBoxGeneratorWindow(QMainWindow):
-    def __init__(self, data):
+    def __init__(self, data, excel_options):
         super().__init__()
         self.items, self.boxes, self.players_tmpl, self.inv_df = data
         self.current_rows = []
         self.setWindowTitle("Loot Box Generator")
+        self.excel_options = excel_options
         self._build_ui()
 
     def _build_ui(self):
         w = QWidget()
         v = QVBoxLayout(w)
-        # Auto-update Excel
-        self.auto_chk = QCheckBox("Auto-update Excel")
-        v.addWidget(self.auto_chk)
         # Box selector
         h1 = QHBoxLayout()
         h1.addWidget(QLabel("Loot Box:"))
@@ -238,9 +250,16 @@ class LootBoxGeneratorWindow(QMainWindow):
         # Table
         self.table = QTableWidget()
         v.addWidget(self.table)
+        # Excel Options button
+        excel_btn = QPushButton("Excel Options")
+        excel_btn.clicked.connect(self.show_excel_options)
+        v.addWidget(excel_btn)
         self.setCentralWidget(w)
         self.setMinimumSize(500, 327)
         self.resize(500, 327)
+
+    def show_excel_options(self):
+        self.excel_options.exec()
 
     def _hr(self):
         ln = QFrame()
@@ -294,7 +313,7 @@ class LootBoxGeneratorWindow(QMainWindow):
                     self.inv_window.owner_combo.setCurrentText("Party")
 
                 # excel update
-                if self.auto_chk.isChecked():
+                if self.excel_options.auto_chk.isChecked():
                     write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
                 return
 
@@ -321,7 +340,7 @@ class LootBoxGeneratorWindow(QMainWindow):
         if self.inv_window.owner_combo.currentText() != "Party":
             self.inv_window.owner_combo.setCurrentText(self.player_combo.currentText())
         self.inv_window.refresh(self.player_combo.currentText())
-        if self.auto_chk.isChecked():
+        if self.excel_options.auto_chk.isChecked():
             write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
 
     def closeEvent(self, event):
@@ -332,10 +351,11 @@ class LootBoxGeneratorWindow(QMainWindow):
 
 
 class PlayerInventoryWindow(QMainWindow):
-    def __init__(self, data):
+    def __init__(self, data, excel_options):
         super().__init__()
         self.items, self.boxes, self.players_tmpl, self.inv_df = data
         self.setWindowTitle("Player Inventory")
+        self.excel_options = excel_options
         self._build_ui()
 
     def _build_ui(self):
@@ -443,6 +463,9 @@ class PlayerInventoryWindow(QMainWindow):
             row = item_rows.iloc[0].copy()
             row["Qty"] = left
             self.inv_df.loc[len(self.inv_df)] = row
+        # Auto-update Excel if enabled (use shared excel_options)
+        if self.excel_options.auto_chk.isChecked():
+            write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
         self.refresh(owner)
 
     def closeEvent(self, event):
@@ -455,8 +478,9 @@ class PlayerInventoryWindow(QMainWindow):
 if __name__ == "__main__":
     data = load_data(EXCEL_FILE)
     app = QApplication(sys.argv)
-    lw = LootBoxGeneratorWindow(data)
-    iw = PlayerInventoryWindow(data)
+    excel_options = ExcelOptionsWindow()
+    lw = LootBoxGeneratorWindow(data, excel_options)
+    iw = PlayerInventoryWindow(data, excel_options)
     lw.inv_window = iw
     lw.show()
     iw.show()
