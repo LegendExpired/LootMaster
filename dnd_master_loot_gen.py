@@ -12,6 +12,7 @@ Loads real data from ErwinLootTable.xlsx:
 - players_template, inv_df: player inventories
 
 Each window populates controls and tables with real data. Buttons still print actions.
+Clicking the window close (red X) on either window will close both and exit the app.
 
 Run:
     python loot_master_app.py
@@ -44,13 +45,11 @@ EXCEL_FILE = os.path.join(os.path.dirname(__file__), "ErwinLootTable.xlsx")
 
 
 def load_data(filepath):
-    # Load items
     items = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
     items.rename(
         columns={"Value(GP)": "Value", "Max": "MaxQty", "Item scarecity": "Scarcity"},
         inplace=True,
     )
-    # Load boxes
     boxes = pd.read_excel(filepath, sheet_name="Loot box sizes")
     boxes.rename(
         columns={
@@ -63,7 +62,6 @@ def load_data(filepath):
         },
         inplace=True,
     )
-    # Load players -> flatten inventory
     players = pd.read_excel(filepath, sheet_name="Players", header=[0, 1])
     recs = []
     for p in players.columns.levels[0]:
@@ -80,7 +78,6 @@ def load_data(filepath):
     return items, boxes, players, inv
 
 
-# Roll loot by sampling candidates
 def roll_loot(box_name, items_df, boxes_df):
     box = boxes_df[boxes_df.BoxName == box_name].iloc[0]
     c = items_df[
@@ -100,7 +97,6 @@ def roll_loot(box_name, items_df, boxes_df):
     return out
 
 
-# Aggregate inventory for a player or party
 def get_aggregated(inv_df, player):
     df = inv_df if player == "Party" else inv_df[inv_df.Player == player]
     if df.empty:
@@ -142,7 +138,6 @@ def setup_table(table: QTableWidget, headers, rows, action1, action2):
     table.horizontalHeader().setStretchLastSection(True)
 
 
-# --- Loot Box Generator Window ---------------------------------------------
 class LootBoxGeneratorWindow(QMainWindow):
     def __init__(self, data):
         super().__init__()
@@ -226,8 +221,10 @@ class LootBoxGeneratorWindow(QMainWindow):
     def on_drop(self, item):
         print(f"Drop {item}")
 
+    def closeEvent(self, event):
+        QApplication.instance().quit()
 
-# --- Player Inventory Window ----------------------------------------------
+
 class PlayerInventoryWindow(QMainWindow):
     def __init__(self, data):
         super().__init__()
@@ -264,7 +261,6 @@ class PlayerInventoryWindow(QMainWindow):
         self.table = QTableWidget()
         v.addWidget(self.table)
         self.setCentralWidget(w)
-        # initial load
         self.refresh(self.owner_combo.currentText())
 
     def refresh(self, owner):
@@ -288,8 +284,10 @@ class PlayerInventoryWindow(QMainWindow):
     def on_drop(self, item):
         print(f"Drop {item}")
 
+    def closeEvent(self, event):
+        QApplication.instance().quit()
 
-# --- Main entry -----------------------------------------------------------
+
 if __name__ == "__main__":
     data = load_data(EXCEL_FILE)
     app = QApplication(sys.argv)
