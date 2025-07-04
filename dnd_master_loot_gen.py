@@ -693,6 +693,10 @@ class PlayerInventoryWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    # Check if Excel file exists, if not, create it
+    if not os.path.exists(EXCEL_FILE):
+        create_default_loot_excel(EXCEL_FILE)
+
     app = QApplication(sys.argv)
 
     def reload_all():
