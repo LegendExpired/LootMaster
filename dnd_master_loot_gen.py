@@ -284,6 +284,29 @@ def load_data(filepath):
         ):
             raise Exception("Regenerated file")
 
+    # --- Validate all player Qty columns in Players sheet ---
+    for player in players.columns.levels[0]:
+        if player in ("Players", "Party"):
+            continue
+        col = (player, "Qty")
+        if col not in players.columns:
+            QMessageBox.critical(
+                None,
+                "Missing Column in Players Sheet",
+                f"Column 'Qty' for player '{player}' is missing from the Players sheet.\nPlease fix the sheet in Excel and reload.",
+            )
+            sys.exit(1)
+        for idx, val in players[col].items():
+            if not pd.api.types.is_number(val):
+                loot_val = players[(player, "Loot")][idx] if (player, "Loot") in players.columns else str(idx)
+                QMessageBox.critical(
+                    None,
+                    "Invalid Data in Excel",
+                    f"Non-numeric value in column 'Qty' for player '{player}', item '{loot_val}' (row {idx+3}) in the Players sheet.\nPlease fix this value in Excel and reload.",
+                )
+                sys.exit(1)
+        players[col] = pd.to_numeric(players[col], errors="coerce")
+
     # --- Validate inventory items exist in loot table ---
     recs = []
     for p in players.columns.levels[0]:
