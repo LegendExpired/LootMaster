@@ -995,14 +995,20 @@ class PlayerInventoryWindow(QMainWindow):
         if dlg.exec() == QDialog.Accepted and result:
             item, qty = result[0]
             row = self.items[self.items["Item"] == item].iloc[0]
-            self.inv_df.loc[len(self.inv_df)] = {
-                "Player": owner,
-                "Item": item,
-                "Qty": qty,
-                "Value": row["Value"],
-                "Weight": row["Weight"],
-                "Scarcity": row["Scarcity"],
-            }
+            # --- Merge with existing inventory for this player/item ---
+            mask = (self.inv_df["Player"] == owner) & (self.inv_df["Item"] == item)
+            if mask.any():
+                idx = self.inv_df[mask].index[0]
+                self.inv_df.at[idx, "Qty"] += qty
+            else:
+                self.inv_df.loc[len(self.inv_df)] = {
+                    "Player": owner,
+                    "Item": item,
+                    "Qty": qty,
+                    "Value": row["Value"],
+                    "Weight": row["Weight"],
+                    "Scarcity": row["Scarcity"],
+                }
             if self.excel_options.auto_chk.isChecked():
                 write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
             self.refresh(owner)
