@@ -298,7 +298,11 @@ def load_data(filepath):
             sys.exit(1)
         for idx, val in players[col].items():
             if not pd.api.types.is_number(val):
-                loot_val = players[(player, "Loot")][idx] if (player, "Loot") in players.columns else str(idx)
+                loot_val = (
+                    players[(player, "Loot")][idx]
+                    if (player, "Loot") in players.columns
+                    else str(idx)
+                )
                 QMessageBox.critical(
                     None,
                     "Invalid Data in Excel",
