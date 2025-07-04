@@ -102,62 +102,106 @@ def write_inventory(inv_df, players_template, filepath):
 
 # --- Data loading and logic ------------------------------------------------
 def load_data(filepath):
-    # Load items
-    try:
-        items = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
-    except FileNotFoundError:
-        dirpath = os.path.dirname(filepath)
+    """
+    Load all data from Excel, with robust error handling for file format issues.
+    Returns: items, boxes, players, inv
+    """
+    import shutil
+
+    # --- Helper: show error and offer to regenerate or rename ---
+    def show_format_error(msg, xl_ref=None):
         ret = QMessageBox.question(
             None,
-            "Excel File Not Found",
-            f"Excel file not found in:\n{dirpath}\n\nWould you like to create a new file?",
-            QMessageBox.Yes | QMessageBox.No,
+            "Excel Format Error",
+            msg
+            + "\n\nWould you like to regenerate the file?\n\nYes: Overwrite with a new blank file.\nNo: Rename current file to 'loot_table_error.xlsx' and create a new blank one.",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
         )
         if ret == QMessageBox.Yes:
             create_default_loot_excel(filepath)
-            items = pd.read_excel(filepath, sheet_name="Loot").dropna(subset=["Item"])
-        else:
-            raise
-    except PermissionError as e:
-        QMessageBox.critical(
-            None,
-            "Excel File Locked or Permission Denied",
-            f"Cannot read Excel file.\n\nReason: {str(e)}\n\nPlease close the file in Excel or check your permissions.",
-        )
-        raise
-    except OSError as e:
-        import errno
+            return True
+        elif ret == QMessageBox.No:
+            # Ensure all file handles are closed before renaming
+            if xl_ref is not None:
+                try:
+                    xl_ref.close()
+                except Exception:
+                    pass
+            import gc
 
-        if e.errno == errno.ENOSPC:
-            QMessageBox.critical(None, "Disk Full", "Loading failed: Disk is full.")
-        elif e.errno == errno.EINVAL:
-            QMessageBox.critical(
-                None, "Invalid File Path", f"Invalid file path: {filepath}"
+            gc.collect()  # Extra safety to release file handles
+            error_path = os.path.join(
+                os.path.dirname(filepath), "loot_table_error.xlsx"
             )
+            if os.path.exists(error_path):
+                ow = QMessageBox.question(
+                    None,
+                    "Error File Exists",
+                    f"'{error_path}' already exists. Overwrite it?",
+                    QMessageBox.Yes | QMessageBox.Cancel,
+                )
+                if ow != QMessageBox.Yes:
+                    sys.exit(1)
+            try:
+                shutil.move(filepath, error_path)
+            except Exception as e:
+                QMessageBox.critical(
+                    None, "File Rename Error", f"Could not rename file: {str(e)}"
+                )
+                sys.exit(1)
+            create_default_loot_excel(filepath)
+            return True
         else:
-            QMessageBox.critical(
-                None, "File Read Error", f"Error reading Excel file:\n{str(e)}"
-            )
-        raise
+            sys.exit(1)
+
+    # --- Helper: check required columns ---
+    def check_columns(df, required, sheet, xl_ref=None):
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            if show_format_error(
+                f"Missing columns in '{sheet}' sheet: {missing}", xl_ref=xl_ref
+            ):
+                raise Exception("Regenerated file")
+
+    # --- Try to load all sheets, handle missing/corrupt ---
+    try:
+        xl = pd.ExcelFile(filepath)
     except Exception as e:
-        QMessageBox.critical(
-            None, "Unknown Error", f"Unexpected error reading Excel file:\n{str(e)}"
-        )
-        raise
+        if show_format_error(f"Could not open Excel file.\nReason: {str(e)}"):
+            raise Exception("Regenerated file")
+
+    required_sheets = ["Loot", "Loot box sizes", "Players"]
+    missing_sheets = [s for s in required_sheets if s not in xl.sheet_names]
+    if missing_sheets:
+        if show_format_error(
+            f"Excel file is missing required sheets: {missing_sheets}", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
+
+    # --- Loot sheet ---
+    try:
+        items = xl.parse("Loot").dropna(subset=["Item"])
+    except Exception as e:
+        if show_format_error(
+            f"Could not read 'Loot' sheet.\nReason: {str(e)}", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
     items.rename(
         columns={"Value(GP)": "Value", "Max": "MaxQty", "Item scarecity": "Scarcity"},
         inplace=True,
     )
-    # Load boxes
+    check_columns(
+        items, ["Item", "Value", "MaxQty", "Weight", "Scarcity"], "Loot", xl_ref=xl
+    )
+
+    # --- Loot box sizes sheet ---
     try:
-        boxes = pd.read_excel(filepath, sheet_name="Loot box sizes")
+        boxes = xl.parse("Loot box sizes")
     except Exception as e:
-        QMessageBox.critical(
-            None,
-            "Excel Sheet Error",
-            f"Error loading 'Loot box sizes' sheet:\n{str(e)}",
-        )
-        raise
+        if show_format_error(
+            f"Could not read 'Loot box sizes' sheet.\nReason: {str(e)}", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
     boxes.rename(
         columns={
             "Loot box name": "BoxName",
@@ -169,24 +213,45 @@ def load_data(filepath):
         },
         inplace=True,
     )
-    # Read players sheet with two header rows manually
+    check_columns(
+        boxes,
+        ["BoxName", "MaxItems", "MinValue", "MaxValue", "MinScarcity", "MaxScarcity"],
+        "Loot box sizes",
+        xl_ref=xl,
+    )
+
+    # --- Players sheet: check MultiIndex header ---
     try:
-        raw = pd.read_excel(filepath, sheet_name="Players", header=None)
+        raw = xl.parse("Players", header=None)
     except Exception as e:
-        QMessageBox.critical(
-            None, "Excel Sheet Error", f"Error loading 'Players' sheet:\n{str(e)}"
-        )
-        raise
+        if show_format_error(
+            f"Could not read 'Players' sheet.\nReason: {str(e)}", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
+    if raw.shape[0] < 3 or raw.shape[1] < 3:
+        if show_format_error(
+            "'Players' sheet format is invalid (not enough rows/columns).", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
     raw = raw.iloc[:, 1:]
-    # First two rows are headers
     lvl0 = raw.iloc[0].fillna(method="ffill")
     lvl1 = raw.iloc[1]
-    # Data starts from row 2
+    if lvl0.isnull().any() or lvl1.isnull().any():
+        if show_format_error(
+            "'Players' sheet header rows contain missing values.", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
     data = raw.iloc[2:].reset_index(drop=True)
-    # Build MultiIndex columns
-    players = data.copy()
-    players.columns = pd.MultiIndex.from_arrays([lvl0, lvl1])
-    # Flatten inventory records
+    try:
+        players = data.copy()
+        players.columns = pd.MultiIndex.from_arrays([lvl0, lvl1])
+    except Exception as e:
+        if show_format_error(
+            f"'Players' sheet header format error: {str(e)}", xl_ref=xl
+        ):
+            raise Exception("Regenerated file")
+
+    # --- Validate inventory items exist in loot table ---
     recs = []
     for p in players.columns.levels[0]:
         if p in ("Players", "Party"):
@@ -196,7 +261,46 @@ def load_data(filepath):
             qt = r.get((p, "Qty"))
             if pd.notna(it) and pd.notna(qt):
                 recs.append({"Player": p, "Item": it, "Qty": int(qt)})
-    inv = pd.DataFrame(recs).merge(
+    inv = pd.DataFrame(recs)
+    missing_items = set(inv["Item"]) - set(items["Item"])
+    if missing_items:
+        msg = (
+            f"The following inventory items are missing from the loot table:\n"
+            f"{list(missing_items)}\n\nPlease add them to the 'Loot' sheet and click Retry."
+        )
+        while True:
+            ret = QMessageBox.question(
+                None,
+                "Missing Inventory Items",
+                msg,
+                QMessageBox.Retry | QMessageBox.Abort,
+            )
+            if ret == QMessageBox.Retry:
+                xl.close()
+                xl = pd.ExcelFile(filepath)
+                items = xl.parse("Loot").dropna(subset=["Item"])
+                items.rename(
+                    columns={
+                        "Value(GP)": "Value",
+                        "Max": "MaxQty",
+                        "Item scarecity": "Scarcity",
+                    },
+                    inplace=True,
+                )
+                if set(inv["Item"]) - set(items["Item"]):
+                    continue
+                break
+            else:
+                xl.close()
+                sys.exit(1)
+    xl.close()
+    # --- Validate numeric columns ---
+    for col in ["Qty"]:
+        if not pd.api.types.is_numeric_dtype(inv[col]):
+            inv = inv[pd.to_numeric(inv[col], errors="coerce").notnull()]
+            inv[col] = pd.to_numeric(inv[col], errors="coerce")
+    # Merge loot info
+    inv = inv.merge(
         items[["Item", "Value", "Weight", "Scarcity"]], on="Item", how="left"
     )
     return items, boxes, players, inv
