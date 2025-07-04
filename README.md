@@ -25,12 +25,13 @@ The **Loot Master App** is a lightweight PySide6 desktop application designed fo
 * **Generate randomized loot** from predefined loot boxes
 * **Assign items** directly into player inventories
 * **View and manage** party or individual inventories
-* **Persist data** in an Excel spreadsheet (`ErwinLootTable.xlsx`)
+* **Manually add, trade, or drop items** in player inventories
+* **Persist data** in an Excel spreadsheet (`ErwinLootTable.xlsx`), with robust error handling and options for auto-update or manual read/write
 
 It provides two synchronized windows:
 
 1. **Loot Box Generator** – select a loot box, roll for loot, take or drop items
-2. **Player Inventory** – view aggregated inventories by player or entire party
+2. **Player Inventory** – view aggregated inventories by player or entire party, with manual add, trade, and drop actions
 
 ---
 
@@ -39,9 +40,12 @@ It provides two synchronized windows:
 * **Real Excel I/O**: Loads `Loot`, `Loot box sizes`, and `Players` sheets. Optionally writes back updated player inventories.
 * **Roll Logic**: Filters items by scarcity and value ranges, then randomly samples based on box definitions.
 * **Dynamic UI**: Two windows stay in sync. Taking loot immediately updates the inventory view.
-* **Auto-update Toggle**: Check a box to write inventory changes back to the Excel file in real time.
+* **Auto-update Toggle & Excel Options**: Use the Excel Options dialog to enable auto-update, or manually read/write Excel data on demand.
+* **Manual Add, Trade, Drop**: Add items, trade between players, or drop items from inventory with intuitive popups and sliders.
+* **Error Handling**: If the Excel file is missing, it is auto-created. User-friendly dialogs for file errors and invalid actions.
 * **One-decimal Precision**: All weights and values are rounded to one decimal place.
 * **Clean, Styled Tables**: Tables with alternating row colors, rounded action buttons, and clear totals.
+* **No Row Index**: Row indices are hidden in all tables and not saved to Excel.
 
 ---
 
@@ -66,17 +70,31 @@ python loot_master_app.py
 
 * **Loot Box Generator Window**
 
-  1. (Optional) Check **Auto-update Excel** to persist immediately.
+  1. (Optional) Open **Excel Options** to enable **Auto-update Excel** or use manual **Read/Write**.
   2. Select a **Loot Box** from the drop-down.
   3. Click **Roll** to populate the loot table.
   4. (Optional) Select **Player** and click **Take** on any row, or **Take All**.
-  5. Dropped items are removed from the current roll only.
+  5. Click **Drop** to remove items from the current roll or from player inventory (with quantity slider).
 
 * **Player Inventory Window**
 
   1. Select a **Player** or **Party** to view aggregated inventory.
-  2. Totals for weight and value update automatically.
-  3. (Future) Buttons allow trading or dropping items.
+  2. Use the **+** button to manually add items to a player's inventory (popup with item/quantity selection).
+  3. Use the **Trade** button to move items between players (popup with slider).
+  4. Use the **Drop** button to remove items from inventory (popup with slider).
+  5. Totals for weight and value update automatically.
+  6. Actions are disabled when "Party" is selected.
+
+* **Excel Options Dialog**
+
+  - Access via the menu or settings button.
+  - Toggle **Auto-update** to write changes to Excel in real time.
+  - Use **Read** to reload all data from Excel, or **Write** to save all inventories on demand (when auto-update is off).
+
+* **Error Handling**
+
+  - If the Excel file is missing, it is auto-created with default sheets.
+  - User-friendly dialogs appear for file errors, permission issues, or invalid actions.
 
 Closing either window via the red **X** will exit the entire application.
 
