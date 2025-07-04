@@ -190,6 +190,7 @@ class ExcelOptionsWindow(QDialog):
         self.setMinimumSize(250, 100)
         layout = QVBoxLayout()
         self.auto_chk = QCheckBox("Auto-update Excel")
+        self.auto_chk.setChecked(True)  # Automatically checked by default
         layout.addWidget(self.auto_chk)
         btns = QDialogButtonBox(QDialogButtonBox.Ok)
         btns.accepted.connect(self.accept)
@@ -396,7 +397,7 @@ class PlayerInventoryWindow(QMainWindow):
             ["Rarity", "Item", "Qty", "Value", "Weight", "Trade", "Drop"],
             rows,
             self.on_trade,
-            self.on_drop,
+            self.on_user_drop_or_trade,
         )
         tw = sum(r[4] for r in rows)
         tv = sum(r[3] for r in rows)
@@ -404,9 +405,9 @@ class PlayerInventoryWindow(QMainWindow):
         self.vlbl.setText(f"Total Value: {tv:.1f}")
 
     def on_trade(self, item):
-        print(f"Trade {item}")
+        return self.on_user_drop_or_trade(item, drop_or_trade="trade")
 
-    def on_drop(self, item):
+    def on_user_drop_or_trade(self, item, drop_or_trade="drop"):
         owner = self.owner_combo.currentText()
         if owner == "Party":
             QMessageBox.information(
@@ -422,9 +423,15 @@ class PlayerInventoryWindow(QMainWindow):
         if qty > 1:
             # Show dialog with slider
             dlg = QDialog(self)
-            dlg.setWindowTitle(f"Drop {item}")
+            if drop_or_trade == "trade":
+                dlg.setWindowTitle(f"Trade {item}")
+            else:
+                dlg.setWindowTitle(f"Drop {item}")
             layout = QVBoxLayout()
-            label = QLabel(f"How many '{item}' to drop? (1-{qty})")
+            if drop_or_trade == "trade":
+                label = QLabel(f"How many '{item}' to trade? (1-{qty})")
+            else:
+                label = QLabel(f"How many '{item}' to drop? (1-{qty})")
             layout.addWidget(label)
             slider = QSlider(Qt.Horizontal)
             slider.setMinimum(1)
