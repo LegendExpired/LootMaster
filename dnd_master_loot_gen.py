@@ -279,8 +279,16 @@ class LootBoxGeneratorWindow(QMainWindow):
                 }
                 del self.current_rows[i]
                 self._refresh_table()
-                # dynamic inventory
-                self.inv_window.refresh(self.player_combo.currentText())
+                # Change player in inventory window to match loot window (unless Party is selected)
+                if self.inv_window.owner_combo.currentText() != "Party":
+                    self.inv_window.owner_combo.setCurrentText(
+                        self.player_combo.currentText()
+                    )
+                    self.inv_window.refresh(self.player_combo.currentText())
+                else:
+                    self.inv_window.refresh("Party")
+                    self.inv_window.owner_combo.setCurrentText("Party")
+
                 # excel update
                 if self.auto_chk.isChecked():
                     write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
@@ -305,6 +313,9 @@ class LootBoxGeneratorWindow(QMainWindow):
             }
         self.current_rows = []
         self._refresh_table()
+        # Change player in inventory window to match loot window (unless Party is selected)
+        if self.inv_window.owner_combo.currentText() != "Party":
+            self.inv_window.owner_combo.setCurrentText(self.player_combo.currentText())
         self.inv_window.refresh(self.player_combo.currentText())
         if self.auto_chk.isChecked():
             write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)
