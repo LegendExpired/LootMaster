@@ -44,7 +44,18 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 
-VERSION = "1.0.0"
+
+# --- Version management: read from VERSION file ---
+def get_version():
+    version_file = os.path.join(os.path.dirname(__file__), "VERSION")
+    try:
+        with open(version_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
+
+
+VERSION = get_version()
 
 # --- Excel I/O functions ---------------------------------------------------
 EXCEL_FILE = os.path.join(os.path.dirname(__file__), "loot_table.xlsx")
@@ -887,13 +898,13 @@ class PlayerInventoryWindow(QMainWindow):
                 self, "Drop Disabled", "Cannot drop items when 'Party' is selected."
             )
             return
-        # Find the row for this item
-        df = self.inv_df[self.inv_df["Player"] == owner]
-        item_rows = df[df["Item"] == item]
+        # Find all rows for this item/player
+        mask = (self.inv_df["Player"] == owner) & (self.inv_df["Item"] == item)
+        item_rows = self.inv_df[mask]
         if item_rows.empty:
             return
-        qty = int(item_rows["Qty"].sum())
-        if qty > 1:
+        total_qty = int(item_rows["Qty"].sum())
+        if total_qty > 1:
             # Show dialog with slider
             dlg = QDialog(self)
             if drop_or_trade == "trade":
@@ -902,13 +913,13 @@ class PlayerInventoryWindow(QMainWindow):
                 dlg.setWindowTitle(f"Drop {item}")
             layout = QVBoxLayout()
             if drop_or_trade == "trade":
-                label = QLabel(f"How many '{item}' to trade? (1-{qty})")
+                label = QLabel(f"How many '{item}' to trade? (1-{total_qty})")
             else:
-                label = QLabel(f"How many '{item}' to drop? (1-{qty})")
+                label = QLabel(f"How many '{item}' to drop? (1-{total_qty})")
             layout.addWidget(label)
             slider = QSlider(Qt.Horizontal)
             slider.setMinimum(1)
-            slider.setMaximum(qty)
+            slider.setMaximum(total_qty)
             slider.setValue(1)
             layout.addWidget(slider)
             val_label = QLabel("1")
@@ -931,18 +942,20 @@ class PlayerInventoryWindow(QMainWindow):
                 return
         else:
             drop_qty = 1
-        # Remove drop_qty from inventory
-        left = qty - drop_qty
-        # Remove all rows for this item/player
-        idxs = self.inv_df[
-            (self.inv_df["Player"] == owner) & (self.inv_df["Item"] == item)
-        ].index
-        self.inv_df.drop(idxs, inplace=True)
-        if left > 0:
-            # Add back the remaining qty as a single row
-            row = item_rows.iloc[0].copy()
-            row["Qty"] = left
-            self.inv_df.loc[len(self.inv_df)] = row
+        # Decrement quantity across rows (in order)
+        qty_to_remove = drop_qty
+        for idx in item_rows.index:
+            row_qty = int(self.inv_df.at[idx, "Qty"])
+            if row_qty > qty_to_remove:
+                self.inv_df.at[idx, "Qty"] = row_qty - qty_to_remove
+                qty_to_remove = 0
+                break
+            else:
+                qty_to_remove -= row_qty
+                self.inv_df.drop(idx, inplace=True)
+            if qty_to_remove <= 0:
+                break
+        self.inv_df.reset_index(drop=True, inplace=True)
         # Auto-update Excel if enabled (use shared excel_options)
         if self.excel_options.auto_chk.isChecked():
             write_inventory(self.inv_df, self.players_tmpl, EXCEL_FILE)

@@ -5,7 +5,7 @@ a = Analysis(
     ['dnd_master_loot_gen.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('resources/loot_box_icon.ico', 'resources')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
