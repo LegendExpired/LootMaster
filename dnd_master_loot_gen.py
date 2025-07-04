@@ -184,18 +184,38 @@ def setup_table(table: QTableWidget, headers, rows, action1, action2):
 
 # --- GUI windows -----------------------------------------------------------
 class ExcelOptionsWindow(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, reload_callback=None):
         super().__init__(parent)
         self.setWindowTitle("Excel Options")
-        self.setMinimumSize(250, 100)
+        self.setMinimumSize(250, 150)
         layout = QVBoxLayout()
         self.auto_chk = QCheckBox("Auto-update Excel")
         self.auto_chk.setChecked(True)  # Automatically checked by default
         layout.addWidget(self.auto_chk)
+        # Read and Write buttons
+        btn_layout = QHBoxLayout()
+        self.read_btn = QPushButton("Read")
+        self.write_btn = QPushButton("Write")
+        btn_layout.addWidget(self.read_btn)
+        btn_layout.addWidget(self.write_btn)
+        layout.addLayout(btn_layout)
+        # Disable buttons if auto-update is checked
+        def update_btns():
+            enabled = not self.auto_chk.isChecked()
+            self.read_btn.setEnabled(enabled)
+            self.write_btn.setEnabled(enabled)
+        self.auto_chk.stateChanged.connect(update_btns)
+        update_btns()
         btns = QDialogButtonBox(QDialogButtonBox.Ok)
         btns.accepted.connect(self.accept)
         layout.addWidget(btns)
         self.setLayout(layout)
+        self.reload_callback = reload_callback
+        self.read_btn.clicked.connect(self.on_read)
+
+    def on_read(self):
+        if self.reload_callback:
+            self.reload_callback()
 
 
 class LootBoxGeneratorWindow(QMainWindow):
@@ -568,9 +588,26 @@ class PlayerInventoryWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    data = load_data(EXCEL_FILE)
     app = QApplication(sys.argv)
-    excel_options = ExcelOptionsWindow()
+    # Define a reload function to update all windows
+    def reload_all():
+        new_data = load_data(EXCEL_FILE)
+        lw.items, lw.boxes, lw.players_tmpl, lw.inv_df = new_data
+        iw.items, iw.boxes, iw.players_tmpl, iw.inv_df = new_data
+        # Update loot box and player lists
+        lw.box_combo.clear()
+        lw.box_combo.addItems(lw.boxes.BoxName.tolist())
+        players = [p for p in lw.players_tmpl.columns.levels[0] if p not in ("Players", "Party")]
+        lw.player_combo.clear()
+        lw.player_combo.addItems(players)
+        owners = players + ["Party"]
+        iw.owner_combo.clear()
+        iw.owner_combo.addItems(owners)
+        # Refresh tables
+        lw._refresh_table()
+        iw.refresh(iw.owner_combo.currentText())
+    excel_options = ExcelOptionsWindow(reload_callback=reload_all)
+    data = load_data(EXCEL_FILE)
     lw = LootBoxGeneratorWindow(data, excel_options)
     iw = PlayerInventoryWindow(data, excel_options)
     lw.inv_window = iw
