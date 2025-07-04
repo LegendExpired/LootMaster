@@ -1,164 +1,116 @@
 # Loot Master App
 
-**Two windows for quick D\&D loot management**
+> **Note:** The code readability needs massive work. As this was a rushed and quick project, someone can refactor the code later for readability and maintainability.
 
----
+## Version
 
-## Table of Contents
+Current version: **1.0.0**
 
-1. [About](#about)
-2. [Current Functionality](#current-functionality)
-3. [Installation](#installation)
-4. [Usage](#usage)
-5. [Configuration & Data Format](#configuration--data-format)
-6. [Development Roadmap](#development-roadmap)
-7. [Future Plans](#future-plans)
-8. [Contributing](#contributing)
-9. [License](#license)
+See [CHANGELOG.md](CHANGELOG.md) for a full list of changes.
 
----
+## Overview
+Loot Master is a D&D loot and inventory management app with a PySide6 GUI and Excel integration. It allows you to generate loot boxes, manage player inventories, and persist all data in an Excel file.
 
-## About
+<img src="resources/loot_box_icon.png" alt="Loot Master Icon" width="64" height="64" />
 
-The **Loot Master App** is a lightweight PySide6 desktop application designed for D\&D game masters to:
+## Features
+- Two windows: Loot Box Generator and Player Inventory
+- Real-time updates to inventory and loot
+- Auto-update Excel file (loot_table.xlsx) with all changes
+- Robust error handling for Excel file and data issues
+- User-friendly dialogs for all errors and user actions
 
-* **Generate randomized loot** from predefined loot boxes
-* **Assign items** directly into player inventories
-* **View and manage** party or individual inventories
-* **Manually add, trade, or drop items** in player inventories
-* **Persist data** in an Excel spreadsheet (`ErwinLootTable.xlsx`), with robust error handling and options for auto-update or manual read/write
+## How to Use the Application
 
-It provides two synchronized windows:
+### 1. Running the App
+- Make sure you have Python 3.8+ installed.
+- Install dependencies (see below).
+- Run the app:
+  ```sh
+  python dnd_master_loot_gen.py
+  ```
+- The app will create a default `loot_table.xlsx` if it does not exist.
 
-1. **Loot Box Generator** – select a loot box, roll for loot, take or drop items
-2. **Player Inventory** – view aggregated inventories by player or entire party, with manual add, trade, and drop actions
+### 2. Using the GUI
+- **Loot Box Generator Window:**
+  - Select a loot box type and player, then click 'Roll' to generate loot.
+  - Use 'Take' or 'Take All' to add loot to the selected player's inventory.
+  - 'Excel Options' lets you enable/disable auto-update and manually read/write Excel.
+- **Player Inventory Window:**
+  - Select a player or 'Party' to view inventory.
+  - Use '+' to add items to a player's inventory.
+  - Use 'Trade' or 'Drop' to move or remove items (cannot drop/trade as 'Party').
 
----
+### 3. Editing the Excel File
+- The app uses `loot_table.xlsx` in the same folder as the script.
+- You can edit the Excel file directly, but keep the sheet names and columns as generated.
+- If you add new items or players, ensure all required columns are present and numeric values are valid.
+- If the file is corrupted or missing columns/sheets, the app will prompt you to fix or regenerate it.
 
-## Current Functionality
+## App Icon
+- Please use `loot_box_icon.ico` as the app icon. Place this file in the same directory as the script.
 
-* **Real Excel I/O**: Loads `Loot`, `Loot box sizes`, and `Players` sheets. Optionally writes back updated player inventories.
-* **Roll Logic**: Filters items by scarcity and value ranges, then randomly samples based on box definitions.
-* **Dynamic UI**: Two windows stay in sync. Taking loot immediately updates the inventory view.
-* **Auto-update Toggle & Excel Options**: Use the Excel Options dialog to enable auto-update, or manually read/write Excel data on demand.
-* **Manual Add, Trade, Drop**: Add items, trade between players, or drop items from inventory with intuitive popups and sliders.
-* **Error Handling**: If the Excel file is missing, it is auto-created. User-friendly dialogs for file errors and invalid actions.
-* **One-decimal Precision**: All weights and values are rounded to one decimal place.
-* **Clean, Styled Tables**: Tables with alternating row colors, rounded action buttons, and clear totals.
-* **No Row Index**: Row indices are hidden in all tables and not saved to Excel.
+## How to Build the Application
 
----
-
-## Installation
-
-1. Clone or download this repository.
-2. Ensure you have Python 3.8+ installed (64-bit recommended).
-3. Install dependencies:
-
-   ```bash
+1. **Clone or Download the Repository**
+2. **Install Python 3.8+**
+3. **Install Dependencies:**
+   ```sh
+   pip install -r requirements.txt
+   # or, if requirements.txt is missing:
    pip install PySide6 pandas openpyxl
    ```
-4. Place your `ErwinLootTable.xlsx` next to `loot_master_app.py`.
+4. **Run the App:**
+   ```sh
+   python dnd_master_loot_gen.py
+   ```
+
+### Build a Standalone Executable with PyInstaller
+
+1. **Install PyInstaller:**
+   ```sh
+   pip install pyinstaller
+   ```
+2. **Build the App as a Single Executable:**
+   ```sh
+   pyinstaller --onefile --windowed --icon=resources/loot_box_icon.ico dnd_master_loot_gen.py
+   ```
+   - The `--onefile` flag creates a single executable.
+   - The `--windowed` flag prevents a console window from appearing (for GUI apps).
+   - The `--icon` flag sets the app icon (ensure `loot_box_icon.ico` is present).
+3. **Find the Executable:**
+   - The output will be in the `dist/` folder as `dnd_master_loot_gen.exe` (Windows) or the appropriate binary for your OS.
+
+## Developer Environment Setup
+
+1. **Recommended Tools:**
+   - Visual Studio Code or PyCharm
+   - Python 3.8+
+   - Git
+2. **Install Dev Dependencies:**
+   - (Optional) Use a virtual environment:
+     ```sh
+     python -m venv venv
+     source venv/bin/activate  # On Windows: venv\Scripts\activate
+     ```
+   - Install packages:
+     ```sh
+     pip install -r requirements.txt
+     # or
+     pip install PySide6 pandas openpyxl
+     ```
+3. **Linting and Formatting:**
+   - Use `flake8` or `pylint` for linting.
+   - Use `black` for code formatting.
+4. **Testing:**
+   - Manual testing via the GUI is recommended.
+   - Add unit tests for new features if possible.
+
+## Troubleshooting
+- If you see errors about missing dependencies, install them with pip.
+- If the Excel file is locked, close it in Excel and retry.
+- If you get format errors, use the app's dialogs to regenerate or fix the file.
 
 ---
 
-## Usage
-
-```bash
-python loot_master_app.py
-```
-
-* **Loot Box Generator Window**
-
-  1. (Optional) Open **Excel Options** to enable **Auto-update Excel** or use manual **Read/Write**.
-  2. Select a **Loot Box** from the drop-down.
-  3. Click **Roll** to populate the loot table.
-  4. (Optional) Select **Player** and click **Take** on any row, or **Take All**.
-  5. Click **Drop** to remove items from the current roll or from player inventory (with quantity slider).
-
-* **Player Inventory Window**
-
-  1. Select a **Player** or **Party** to view aggregated inventory.
-  2. Use the **+** button to manually add items to a player's inventory (popup with item/quantity selection).
-  3. Use the **Trade** button to move items between players (popup with slider).
-  4. Use the **Drop** button to remove items from inventory (popup with slider).
-  5. Totals for weight and value update automatically.
-  6. Actions are disabled when "Party" is selected.
-
-* **Excel Options Dialog**
-
-  - Access via the menu or settings button.
-  - Toggle **Auto-update** to write changes to Excel in real time.
-  - Use **Read** to reload all data from Excel, or **Write** to save all inventories on demand (when auto-update is off).
-
-* **Error Handling**
-
-  - If the Excel file is missing, it is auto-created with default sheets.
-  - User-friendly dialogs appear for file errors, permission issues, or invalid actions.
-
-Closing either window via the red **X** will exit the entire application.
-
----
-
-## Configuration & Data Format
-
-### Excel Schema (`ErwinLootTable.xlsx`)
-
-* **Loot** sheet:
-
-  * `Item` (string)
-  * `Description` (string)
-  * `Value(GP)` (float)
-  * `Max` (int)
-  * `Weight` (float)
-  * `Item scarecity` (int)
-
-* **Loot box sizes** sheet:
-
-  * `Loot box name` (string)
-  * `Max total items` (int)
-  * `Min box value` (float)
-  * `Max box value` (float)
-  * `Min scarecity` (int)
-  * `Max scarecity` (int)
-
-* **Players** sheet (two header rows):
-
-  * Top row: player names
-  * Second row: columns `Loot` and `Qty`
-  * Rows: current items and quantities per player
-
----
-
-## Development Roadmap
-
-* **Modularize code** into separate modules (`data.py`, `ui.py`, `logic.py`).
-* **Unit Tests** for roll logic and Excel I/O.
-* **Configuration file** (`config.yaml`) for customizing themes and default paths.
-
----
-
-## Future Plans
-
-Yeah this is a once off... if there is a true demand, I may consider putting a proper database and cross platform editor in instead of using excel, but this is just a quick app for now.
-
-I recommend using react native and nodejs with something like google firebase etc if really desired.
-
-Ps. I didn't do number 4 and 5 of the error handling due to time, so please note some error handling is still required.
-
----
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository.
-2. Create a new branch: `git checkout -b feature/YourFeature`.
-3. Commit your changes with clear messages.
-4. Submit a pull request detailing your additions.
-
----
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+For further improvements, see the `errorhandling.md` for a list of known error cases and strategies.

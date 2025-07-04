@@ -42,6 +42,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
+
+VERSION = "1.0.0"
 
 # --- Excel I/O functions ---------------------------------------------------
 EXCEL_FILE = os.path.join(os.path.dirname(__file__), "loot_table.xlsx")
@@ -569,7 +572,14 @@ def create_default_loot_excel(filepath: str):
 class ExcelOptionsWindow(QDialog):
     def __init__(self, parent=None, reload_callback=None, write_callback=None):
         super().__init__(parent)
-        self.setWindowTitle("Excel Options")
+        self.setWindowTitle(f"Excel Options v{VERSION}")
+        self.setWindowIcon(
+            QIcon(
+                os.path.join(
+                    os.path.dirname(__file__), "resources", "loot_box_icon.ico"
+                )
+            )
+        )
         self.setMinimumSize(250, 150)
         layout = QVBoxLayout()
         self.auto_chk = QCheckBox("Auto-update Excel")
@@ -614,7 +624,14 @@ class LootBoxGeneratorWindow(QMainWindow):
         super().__init__()
         self.items, self.boxes, self.players_tmpl, self.inv_df = data
         self.current_rows = []
-        self.setWindowTitle("Loot Box Generator")
+        self.setWindowTitle(f"Loot Box Generator v{VERSION}")
+        self.setWindowIcon(
+            QIcon(
+                os.path.join(
+                    os.path.dirname(__file__), "resources", "loot_box_icon.ico"
+                )
+            )
+        )
         self.excel_options = excel_options
         self._build_ui()
 
@@ -798,7 +815,14 @@ class PlayerInventoryWindow(QMainWindow):
     def __init__(self, data, excel_options):
         super().__init__()
         self.items, self.boxes, self.players_tmpl, self.inv_df = data
-        self.setWindowTitle("Player Inventory")
+        self.setWindowTitle(f"Player Inventory v{VERSION}")
+        self.setWindowIcon(
+            QIcon(
+                os.path.join(
+                    os.path.dirname(__file__), "resources", "loot_box_icon.ico"
+                )
+            )
+        )
         self.excel_options = excel_options
         self._build_ui()
 
