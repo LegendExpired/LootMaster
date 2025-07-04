@@ -23,9 +23,11 @@ This document outlines error situations that still need to be handled in the Loo
 - **Unexpected column names or missing columns**
   - Validate columns on load; if missing or renamed, show a dialog listing the problem and offer to auto-fix or abort.
 - **MultiIndex header issues in Players sheet**
-  - Detect header format problems and prompt the user to fix or auto-reset the sheet.
+  - Detect header format problems and prompt the user to fix or delete and recreate the sheet.
 - **Non-numeric or invalid data in numeric columns (Qty, Value, Weight, Scarcity, etc.)**
   - Validate data types on load; highlight or skip invalid rows, and inform the user.
+- **Inventory items that do not exist in the loot database**
+  - Ensure all inventory items exist in the loot database.  If an item is found in any players inventory but not in the loot database, provide a pop up for the user telling them which item(s) (if there is more than 1 even) are missing from the loot table, and ask them to insert the items (case sensitive) in that table.  The popup should give an option to retry the load or to exit.  If retry it should recheck if the problem is resolved.
 
 ## 3. User Input Related Errors
 - **Entering negative or zero quantities**
