@@ -702,6 +702,22 @@ class LootBoxGeneratorWindow(QMainWindow):
         for i, r in enumerate(self.current_rows):
             if r[1] == item:
                 scar, name, qty, val, wgt = r
+                # User Input Error Handling: Prevent negative/zero or excessive quantities
+                if qty <= 0:
+                    QMessageBox.critical(
+                        self,
+                        "Invalid Quantity",
+                        f"Cannot take zero or negative quantity for '{name}'.",
+                    )
+                    return
+                max_qty = int(self.items[self.items["Item"] == name]["MaxQty"].iloc[0])
+                if qty > max_qty:
+                    QMessageBox.critical(
+                        self,
+                        "Exceeds Maximum",
+                        f"Cannot take more than {max_qty} of '{name}'.",
+                    )
+                    return
                 unit_val = round(val / qty, 1)
                 unit_wgt = round(wgt / qty, 1)
                 self.inv_df.loc[len(self.inv_df)] = {
@@ -736,6 +752,22 @@ class LootBoxGeneratorWindow(QMainWindow):
     def take_all(self):
         player = self.player_combo.currentText()
         for scar, name, qty, val, wgt in self.current_rows:
+            # User Input Error Handling: Prevent negative/zero or excessive quantities
+            if qty <= 0:
+                QMessageBox.critical(
+                    self,
+                    "Invalid Quantity",
+                    f"Cannot take zero or negative quantity for '{name}'.",
+                )
+                continue
+            max_qty = int(self.items[self.items["Item"] == name]["MaxQty"].iloc[0])
+            if qty > max_qty:
+                QMessageBox.critical(
+                    self,
+                    "Exceeds Maximum",
+                    f"Cannot take more than {max_qty} of '{name}'.",
+                )
+                continue
             uv = round(val / qty, 1)
             uw = round(wgt / qty, 1)
             self.inv_df.loc[len(self.inv_df)] = {
