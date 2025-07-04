@@ -36,6 +36,10 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QFrame,
     QCheckBox,
+    QSlider,
+    QDialog,
+    QDialogButtonBox,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
@@ -365,6 +369,7 @@ class PlayerInventoryWindow(QMainWindow):
         self.refresh(self.owner_combo.currentText())
 
     def refresh(self, owner):
+        self._current_owner = owner  # Track current owner for drop logic
         rows = get_aggregated(self.inv_df, owner)
         setup_table(
             self.table,
@@ -382,7 +387,63 @@ class PlayerInventoryWindow(QMainWindow):
         print(f"Trade {item}")
 
     def on_drop(self, item):
-        print(f"Drop {item}")
+        owner = self.owner_combo.currentText()
+        if owner == "Party":
+            QMessageBox.information(
+                self, "Drop Disabled", "Cannot drop items when 'Party' is selected."
+            )
+            return
+        # Find the row for this item
+        df = self.inv_df[self.inv_df["Player"] == owner]
+        item_rows = df[df["Item"] == item]
+        if item_rows.empty:
+            return
+        qty = int(item_rows["Qty"].sum())
+        if qty > 1:
+            # Show dialog with slider
+            dlg = QDialog(self)
+            dlg.setWindowTitle(f"Drop {item}")
+            layout = QVBoxLayout()
+            label = QLabel(f"How many '{item}' to drop? (1-{qty})")
+            layout.addWidget(label)
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(1)
+            slider.setMaximum(qty)
+            slider.setValue(1)
+            layout.addWidget(slider)
+            val_label = QLabel("1")
+            layout.addWidget(val_label)
+            slider.valueChanged.connect(lambda v: val_label.setText(str(v)))
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            layout.addWidget(buttons)
+            dlg.setLayout(layout)
+            result = []
+
+            def accept():
+                result.append(slider.value())
+                dlg.accept()
+
+            buttons.accepted.connect(accept)
+            buttons.rejected.connect(dlg.reject)
+            if dlg.exec() == QDialog.Accepted and result:
+                drop_qty = result[0]
+            else:
+                return
+        else:
+            drop_qty = 1
+        # Remove drop_qty from inventory
+        left = qty - drop_qty
+        # Remove all rows for this item/player
+        idxs = self.inv_df[
+            (self.inv_df["Player"] == owner) & (self.inv_df["Item"] == item)
+        ].index
+        self.inv_df.drop(idxs, inplace=True)
+        if left > 0:
+            # Add back the remaining qty as a single row
+            row = item_rows.iloc[0].copy()
+            row["Qty"] = left
+            self.inv_df.loc[len(self.inv_df)] = row
+        self.refresh(owner)
 
     def closeEvent(self, event):
         QApplication.instance().quit()
