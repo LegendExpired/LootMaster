@@ -8,6 +8,8 @@ This document outlines error situations that still need to be handled in the Loo
   - Retry or allow the user to cancel the operation.
 - **Permission denied when reading/writing Excel file**
   - Show an error dialog with the file path and suggest running the app with appropriate permissions or choosing a different location.
+- **File not found in directory**
+  - Show a popup saying the file was not found (printing out the directory the file is expected in as part of the popup) and then asking the user if they would like to create the file.
 - **Disk full or out of space**
   - Notify the user that saving failed due to insufficient disk space.
 - **File path too long or invalid characters**
