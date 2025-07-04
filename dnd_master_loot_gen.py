@@ -128,9 +128,9 @@ def roll_loot(box_name, items_df, boxes_df):
     box = boxes_df[boxes_df.BoxName == box_name].iloc[0]
     c = items_df[
         (items_df.Scarcity >= box.MinScarcity)
-        & (items_df.Scarcity <= box.MaxScarcity)
-        & (items_df.Value >= box.MinValue)
-        & (items_df.Value <= box.MaxValue)
+        & (itemsDf.Scarcity <= box.MaxScarcity)
+        & (itemsDf.Value >= box.MinValue)
+        & (itemsDf.Value <= box.MaxValue)
     ]
     n = min(int(box.MaxItems), len(c))
     chosen = c.sample(n)
@@ -184,7 +184,7 @@ def setup_table(table: QTableWidget, headers, rows, action1, action2):
 
 # --- GUI windows -----------------------------------------------------------
 class ExcelOptionsWindow(QDialog):
-    def __init__(self, parent=None, reload_callback=None):
+    def __init__(self, parent=None, reload_callback=None, write_callback=None):
         super().__init__(parent)
         self.setWindowTitle("Excel Options")
         self.setMinimumSize(250, 150)
@@ -199,11 +199,13 @@ class ExcelOptionsWindow(QDialog):
         btn_layout.addWidget(self.read_btn)
         btn_layout.addWidget(self.write_btn)
         layout.addLayout(btn_layout)
+
         # Disable buttons if auto-update is checked
         def update_btns():
             enabled = not self.auto_chk.isChecked()
             self.read_btn.setEnabled(enabled)
             self.write_btn.setEnabled(enabled)
+
         self.auto_chk.stateChanged.connect(update_btns)
         update_btns()
         btns = QDialogButtonBox(QDialogButtonBox.Ok)
@@ -211,11 +213,17 @@ class ExcelOptionsWindow(QDialog):
         layout.addWidget(btns)
         self.setLayout(layout)
         self.reload_callback = reload_callback
+        self.write_callback = write_callback
         self.read_btn.clicked.connect(self.on_read)
+        self.write_btn.clicked.connect(self.on_write)
 
     def on_read(self):
         if self.reload_callback:
             self.reload_callback()
+
+    def on_write(self):
+        if self.write_callback:
+            self.write_callback()
 
 
 class LootBoxGeneratorWindow(QMainWindow):
@@ -589,12 +597,10 @@ class PlayerInventoryWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # Define a reload function to update all windows
     def reload_all():
         new_data = load_data(EXCEL_FILE)
         lw.items, lw.boxes, lw.players_tmpl, lw.inv_df = new_data
         iw.items, iw.boxes, iw.players_tmpl, iw.inv_df = new_data
-        # Update loot box and player lists
         lw.box_combo.clear()
         lw.box_combo.addItems(lw.boxes.BoxName.tolist())
         players = [p for p in lw.players_tmpl.columns.levels[0] if p not in ("Players", "Party")]
@@ -603,10 +609,12 @@ if __name__ == "__main__":
         owners = players + ["Party"]
         iw.owner_combo.clear()
         iw.owner_combo.addItems(owners)
-        # Refresh tables
         lw._refresh_table()
         iw.refresh(iw.owner_combo.currentText())
-    excel_options = ExcelOptionsWindow(reload_callback=reload_all)
+    def write_all():
+        # Write all player inventories to Excel using the current data
+        write_inventory(iw.inv_df, iw.players_tmpl, EXCEL_FILE)
+    excel_options = ExcelOptionsWindow(reload_callback=reload_all, write_callback=write_all)
     data = load_data(EXCEL_FILE)
     lw = LootBoxGeneratorWindow(data, excel_options)
     iw = PlayerInventoryWindow(data, excel_options)
