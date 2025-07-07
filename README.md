@@ -115,7 +115,7 @@ Loot Master is a D&D loot and inventory management app with a PySide6 GUI and Ex
 
 For further improvements, see the `errorhandling.md` for a list of known error cases and strategies.
 
-##License
+## License
 
 MIT License
 
